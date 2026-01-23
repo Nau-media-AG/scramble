@@ -24,6 +24,7 @@ use Dedoc\Scramble\Support\Type\Reference\StaticMethodCallReferenceType;
 use Dedoc\Scramble\Support\Type\SelfType;
 use Dedoc\Scramble\Support\Type\Type;
 use Dedoc\Scramble\Support\Type\Union;
+use Dedoc\Scramble\Support\Type\NullType;
 use Dedoc\Scramble\Support\Type\UnknownType;
 use Dedoc\Scramble\Support\Type\VoidType;
 use PhpParser\Node as PhpParserNode;
@@ -98,10 +99,10 @@ class ExpressionTypeInferrer
 
         $type = match (true) {
             $expr instanceof Expr\New_ => $this->inferNewCall($expr, $variableTypeGetter),
-            $expr instanceof Expr\MethodCall => $this->inferMethodCall($expr, $variableTypeGetter),
+            $expr instanceof Expr\MethodCall, $expr instanceof Expr\NullsafeMethodCall => $this->inferMethodCall($expr, $variableTypeGetter),
             $expr instanceof Expr\StaticCall => $this->inferStaticCall($expr, $variableTypeGetter),
             $expr instanceof Expr\FuncCall => $this->inferFuncCall($expr, $variableTypeGetter),
-            $expr instanceof Expr\PropertyFetch => $this->inferPropertyFetch($expr, $variableTypeGetter),
+            $expr instanceof Expr\PropertyFetch, $expr instanceof Expr\NullsafePropertyFetch => $this->inferPropertyFetch($expr, $variableTypeGetter),
             /**
              * When `dim` is empty, it means that the context is setting – handling in AssignHandler.
              *
@@ -136,7 +137,7 @@ class ExpressionTypeInferrer
         );
     }
 
-    private function inferMethodCall(Expr\MethodCall $expr, Closure $variableTypeGetter): Type
+    private function inferMethodCall(Expr\MethodCall|Expr\NullsafeMethodCall $expr, Closure $variableTypeGetter): Type
     {
         // Only string method names support.
         if (! $expr->name instanceof PhpParserNode\Identifier) {
@@ -144,12 +145,15 @@ class ExpressionTypeInferrer
         }
 
         $calleeType = $this->infer($expr->var, $variableTypeGetter);
+        $isNullsafe = $expr instanceof Expr\NullsafeMethodCall;
 
-        return new MethodCallReferenceType(
+        $methodCallType = new MethodCallReferenceType(
             $calleeType,
             $expr->name->name,
             $this->inferArgsTypes($expr->args, $variableTypeGetter),
         );
+
+        return $isNullsafe ? Union::wrap($methodCallType, new NullType) : $methodCallType;
     }
 
     private function inferStaticCall(Expr\StaticCall $expr, Closure $variableTypeGetter): Type
@@ -189,17 +193,20 @@ class ExpressionTypeInferrer
         );
     }
 
-    private function inferPropertyFetch(Expr\PropertyFetch $expr, Closure $variableTypeGetter): Type
+    private function inferPropertyFetch(Expr\PropertyFetch|Expr\NullsafePropertyFetch $expr, Closure $variableTypeGetter): Type
     {
         // Only string prop names support.
         if (! $name = ($expr->name->name ?? null)) {
             return new UnknownType('Cannot infer type of property fetch: not supported yet.');
         }
 
-        return new PropertyFetchReferenceType(
+        $propertyType = new PropertyFetchReferenceType(
             $this->infer($expr->var, $variableTypeGetter),
             $name,
         );
+        $isNullsafe = $expr instanceof Expr\NullsafePropertyFetch;
+
+        return $isNullsafe ? Union::wrap($propertyType, new NullType) : $propertyType;
     }
 
     /**
