@@ -135,6 +135,13 @@ class OffsetSetType extends AbstractType implements LateResolvingType
         $modifyingType->items = $targetItems;
         $modifyingType->isList = KeyedArrayType::checkIsList($targetItems);
 
+        // Mark as a dynamic list when appending with null key ($data[] = ...)
+        // This indicates the array length is not fixed and should use 'items' schema
+        // instead of 'prefixItems' tuple schema in OpenAPI generation.
+        if ($pathItem === null) {
+            $modifyingType->setAttribute('dynamicList', true);
+        }
+
         return $modifyingType;
     }
 

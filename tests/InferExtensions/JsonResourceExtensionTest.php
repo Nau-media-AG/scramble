@@ -111,3 +111,68 @@ it('supports match with throw', function () {
         'required' => ['property'],
     ]);
 });
+
+/**
+ * Test case for GitHub issue #1059
+ * Complex JsonResource with multiple early returns of empty arrays and final return with data
+ *
+ * @see https://github.com/dedoc/scramble/issues/1059
+ */
+class JsonResourceExtensionTest_MultipleEmptyReturns extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        $value = $this->resource->value ?? '';
+
+        if (! is_string($value) || $value === '') {
+            return [];
+        }
+
+        $items = explode(',', $value);
+
+        if (empty($items)) {
+            return [];
+        }
+
+        $data = [];
+        foreach ($items as $item) {
+            $data[] = [
+                'name' => [
+                    'en' => 'English name',
+                    'es' => 'Spanish name',
+                ],
+                'code' => trim($item),
+            ];
+        }
+
+        return $data;
+    }
+}
+
+/**
+ * @see https://github.com/dedoc/scramble/issues/1059
+ *
+ * This test verifies the bug where complex JsonResource with multiple early `return []`
+ * and dynamic array construction produces incorrect schema (tuple-style instead of array).
+ */
+it('supports resource with multiple empty array returns', function () {
+    [$schema] = JsonResourceExtensionTest_analyze($this->infer, $this->context, JsonResourceExtensionTest_MultipleEmptyReturns::class);
+
+    $schemaArray = $schema->toArray();
+
+    // The schema should have 'anyOf' with two possible return types
+    expect($schemaArray)->toHaveKey('anyOf')
+        ->and($schemaArray['anyOf'])->toHaveCount(2);
+
+    // Bug #1059: Schema should NOT contain 'prefixItems' (tuple-style)
+    // Instead, it should use 'items' for proper array representation
+    $hasPrefixItems = collect($schemaArray['anyOf'])->contains(fn ($item) => isset($item['prefixItems']));
+    expect($hasPrefixItems)->toBeFalse('Schema should use "items" (array) not "prefixItems" (tuple)');
+
+    // Verify the dynamic list uses proper 'items' schema
+    $dynamicListSchema = collect($schemaArray['anyOf'])->first(fn ($item) => isset($item['items']));
+    expect($dynamicListSchema)->not->toBeNull()
+        ->and($dynamicListSchema['items'])->toHaveKey('type')
+        ->and($dynamicListSchema['items']['type'])->toBe('object')
+        ->and($dynamicListSchema['items']['properties'])->toHaveKeys(['name', 'code']);
+});

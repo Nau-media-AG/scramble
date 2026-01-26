@@ -85,17 +85,28 @@ class TypeTransformer
             $type instanceof \Dedoc\Scramble\Support\Type\KeyedArrayType
             && $type->isList
         ) {
-            /** @see https://stackoverflow.com/questions/57464633/how-to-define-a-json-array-with-concrete-item-definition-for-every-index-i-e-a */
-            $openApiType = (new ArrayType)
-                ->setMin(count($type->items))
-                ->setMax(count($type->items))
-                ->setPrefixItems(
-                    array_map(
-                        fn ($item) => $this->transform($item->value),
-                        $type->items
+            // Dynamic lists (built via $data[] = ...) use 'items' schema for variable-length arrays.
+            // Literal arrays use 'prefixItems' tuple schema with exact length constraints.
+            if ($type->getAttribute('dynamicList') && count($type->items) > 0) {
+                $itemTypes = array_map(fn ($item) => $this->transform($item->value), $type->items);
+                $itemSchema = count($itemTypes) === 1
+                    ? $itemTypes[0]
+                    : (new AnyOf)->setItems(array_values(array_unique($itemTypes, SORT_REGULAR)));
+
+                $openApiType = (new ArrayType)->setItems($itemSchema);
+            } else {
+                /** @see https://stackoverflow.com/questions/57464633/how-to-define-a-json-array-with-concrete-item-definition-for-every-index-i-e-a */
+                $openApiType = (new ArrayType)
+                    ->setMin(count($type->items))
+                    ->setMax(count($type->items))
+                    ->setPrefixItems(
+                        array_map(
+                            fn ($item) => $this->transform($item->value),
+                            $type->items
+                        )
                     )
-                )
-                ->setAdditionalItems(false);
+                    ->setAdditionalItems(false);
+            }
         } elseif (
             $type instanceof \Dedoc\Scramble\Support\Type\KeyedArrayType
             && ! $type->isList
