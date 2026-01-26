@@ -67,6 +67,15 @@ class ReferenceTypeResolver
             fn (Type $t) => $t instanceof Union ? TypeHelper::mergeTypes(...$t->types) : null,
         );
 
+        // Unpack spread operators in Union children. The replace() above returns
+        // early for Union types without walking children, so unpackIfArray() is
+        // never called on KeyedArrayType items inside the Union.
+        if ($finalizedResolvedType instanceof Union) {
+            $finalizedResolvedType = Union::wrap(
+                array_map(fn ($t) => TypeHelper::unpackIfArray($t), $finalizedResolvedType->types)
+            );
+        }
+
         return $this->resolveLateTypes($finalizedResolvedType->setOriginal($originalType), $originalType)->widen();
     }
 
