@@ -32,6 +32,7 @@ use Dedoc\Scramble\Support\InferExtensions\AfterAnonymousResourceCollectionDefin
 use Dedoc\Scramble\Support\InferExtensions\AfterJsonResourceDefinitionCreatedExtension;
 use Dedoc\Scramble\Support\InferExtensions\AfterResourceCollectionDefinitionCreatedExtension;
 use Dedoc\Scramble\Support\InferExtensions\ArrayMergeReturnTypeExtension;
+use Dedoc\Scramble\Support\InferExtensions\CarbonExtension;
 use Dedoc\Scramble\Support\InferExtensions\EloquentBuilderExtension;
 use Dedoc\Scramble\Support\InferExtensions\EnumPropertyExtension;
 use Dedoc\Scramble\Support\InferExtensions\JsonResourceExtension;
@@ -151,6 +152,7 @@ class ScrambleServiceProvider extends PackageServiceProvider
                     EloquentBuilderExtension::class,
                     RequestExtension::class,
                     EnumPropertyExtension::class,
+                    CarbonExtension::class,
                     AfterJsonResourceDefinitionCreatedExtension::class,
                     AfterResourceCollectionDefinitionCreatedExtension::class,
                     AfterAnonymousResourceCollectionDefinitionCreatedExtension::class,
