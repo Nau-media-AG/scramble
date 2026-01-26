@@ -194,3 +194,101 @@ it('supports resolve method call on a resource with date fields', function () {
         'required' => ['nested'],
     ]);
 });
+
+class JsonResourceExtensionTest_SpreadInMatch extends JsonResource
+{
+    public function toArray(Request $request)
+    {
+        return match ($this->resource->type) {
+            'a' => [
+                ...$this->typeA(),
+                'type' => 'a',
+            ],
+            'b' => [
+                ...$this->typeB(),
+                'type' => 'b',
+            ],
+        };
+    }
+
+    private function typeA(): array
+    {
+        return ['id' => 1, 'name' => 'Type A'];
+    }
+
+    private function typeB(): array
+    {
+        return ['id' => 2, 'name' => 'Type B'];
+    }
+}
+
+it('supports spread operator in match expression', function () {
+    [$schema] = JsonResourceExtensionTest_analyze($this->infer, $this->context, JsonResourceExtensionTest_SpreadInMatch::class);
+
+    expect($schema->toArray())->toBe([
+        'anyOf' => [
+            [
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer', 'enum' => [1]],
+                    'name' => ['type' => 'string', 'enum' => ['Type A']],
+                    'type' => ['type' => 'string', 'enum' => ['a']],
+                ],
+                'required' => ['id', 'name', 'type'],
+            ],
+            [
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer', 'enum' => [2]],
+                    'name' => ['type' => 'string', 'enum' => ['Type B']],
+                    'type' => ['type' => 'string', 'enum' => ['b']],
+                ],
+                'required' => ['id', 'name', 'type'],
+            ],
+        ],
+    ]);
+});
+
+class JsonResourceExtensionTest_SpreadLiteralInMatch extends JsonResource
+{
+    public function toArray(Request $request)
+    {
+        return match ($this->resource->type) {
+            'a' => [
+                ...['id' => 1, 'name' => 'Type A'],
+                'type' => 'a',
+            ],
+            'b' => [
+                ...['id' => 2, 'name' => 'Type B'],
+                'type' => 'b',
+            ],
+        };
+    }
+}
+
+it('supports spread operator with literal arrays in match expression', function () {
+    [$schema] = JsonResourceExtensionTest_analyze($this->infer, $this->context, JsonResourceExtensionTest_SpreadLiteralInMatch::class);
+
+    expect($schema->toArray())->toBe([
+        'anyOf' => [
+            [
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer', 'enum' => [1]],
+                    'name' => ['type' => 'string', 'enum' => ['Type A']],
+                    'type' => ['type' => 'string', 'enum' => ['a']],
+                ],
+                'required' => ['id', 'name', 'type'],
+            ],
+            [
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer', 'enum' => [2]],
+                    'name' => ['type' => 'string', 'enum' => ['Type B']],
+                    'type' => ['type' => 'string', 'enum' => ['b']],
+                ],
+                'required' => ['id', 'name', 'type'],
+            ],
+        ],
+    ]);
+});
