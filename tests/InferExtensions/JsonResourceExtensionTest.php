@@ -111,3 +111,86 @@ it('supports match with throw', function () {
         'required' => ['property'],
     ]);
 });
+
+class JsonResourceExtensionTest_NestedResource extends JsonResource
+{
+    public function toArray(Request $request)
+    {
+        return [
+            'id' => 1,
+            'name' => 'test',
+        ];
+    }
+}
+
+class JsonResourceExtensionTest_WithResolve extends JsonResource
+{
+    public function toArray(Request $request)
+    {
+        return [
+            'nested' => (new JsonResourceExtensionTest_NestedResource($this->resource))->resolve(),
+        ];
+    }
+}
+
+it('supports resolve method call on a resource', function () {
+    [$schema] = JsonResourceExtensionTest_analyze($this->infer, $this->context, JsonResourceExtensionTest_WithResolve::class);
+
+    expect($schema->toArray())->toBe([
+        'type' => 'object',
+        'properties' => [
+            'nested' => [
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer', 'enum' => [1]],
+                    'name' => ['type' => 'string', 'enum' => ['test']],
+                ],
+                'required' => ['id', 'name'],
+            ],
+        ],
+        'required' => ['nested'],
+    ]);
+});
+
+/**
+ * @property SamplePostModel $resource
+ */
+class JsonResourceExtensionTest_NestedResourceWithDate extends JsonResource
+{
+    public function toArray(Request $request)
+    {
+        return [
+            'id' => $this->id,
+            'created_at' => $this->created_at,
+        ];
+    }
+}
+
+class JsonResourceExtensionTest_WithResolveAndDate extends JsonResource
+{
+    public function toArray(Request $request)
+    {
+        return [
+            'nested' => (new JsonResourceExtensionTest_NestedResourceWithDate($this->resource))->resolve(),
+        ];
+    }
+}
+
+it('supports resolve method call on a resource with date fields', function () {
+    [$schema] = JsonResourceExtensionTest_analyze($this->infer, $this->context, JsonResourceExtensionTest_WithResolveAndDate::class);
+
+    expect($schema->toArray())->toBe([
+        'type' => 'object',
+        'properties' => [
+            'nested' => [
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer'],
+                    'created_at' => ['type' => ['string', 'null'], 'format' => 'date-time'],
+                ],
+                'required' => ['id', 'created_at'],
+            ],
+        ],
+        'required' => ['nested'],
+    ]);
+});
