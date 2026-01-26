@@ -229,7 +229,7 @@ class ModelInfo
      */
     protected function getCastType($column, $model)
     {
-        if ($model->hasGetMutator($column) || $model->hasSetMutator($column)) {
+        if ($model->hasGetMutator($column)) {
             return 'accessor';
         }
 
