@@ -58,6 +58,11 @@ class JsonResourceExtension implements MethodReturnTypeExtension, PropertyTypeEx
                 ? $this->getModelMethodReturn($event->getInstance()->name, 'toArray', $event->arguments, $event->scope)
                 : null,
 
+            'resolve' => ReferenceTypeResolver::getInstance()->resolve(
+                $event->scope,
+                new MethodCallReferenceType($event->getInstance(), 'toArray', arguments: $event->arguments->all()),
+            ),
+
             'response', 'toResponse' => new Generic(JsonResponse::class, [
                 new Generic(ResourceResponse::class, [$event->getInstance()]),
                 new UnknownType,
