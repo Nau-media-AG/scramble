@@ -72,7 +72,13 @@ class ReferenceTypeResolver
         // never called on KeyedArrayType items inside the Union.
         if ($finalizedResolvedType instanceof Union) {
             $finalizedResolvedType = Union::wrap(
-                array_map(fn ($t) => TypeHelper::unpackIfArray($t), $finalizedResolvedType->types)
+                collect($finalizedResolvedType->types)
+                    ->flatMap(function ($t) {
+                        $unpacked = TypeHelper::unpackIfArray($t);
+
+                        return $unpacked instanceof Union ? $unpacked->types : [$unpacked];
+                    })
+                    ->all()
             );
         }
 

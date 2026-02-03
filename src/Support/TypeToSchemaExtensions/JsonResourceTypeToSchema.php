@@ -17,6 +17,7 @@ use Dedoc\Scramble\Support\Type\ObjectType;
 use Dedoc\Scramble\Support\Type\Reference\MethodCallReferenceType;
 use Dedoc\Scramble\Support\Type\Type;
 use Dedoc\Scramble\Support\Type\TypeHelper;
+use Dedoc\Scramble\Support\Type\Union;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Http\Resources\Json\ResourceResponse;
@@ -60,6 +61,19 @@ class JsonResourceTypeToSchema extends TypeToSchemaExtension
         // The case when `toArray` is not defined.
         if ($array instanceof ArrayType) {
             return $this->openApiTransformer->transform($array);
+        }
+
+        if ($array instanceof Union) {
+            $types = array_map(function ($member) {
+                if ($member instanceof KeyedArrayType) {
+                    $member->items = $this->flattenMergeValues($member->items);
+                    $member->isList = KeyedArrayType::checkIsList($member->items);
+                }
+
+                return $member;
+            }, $array->types);
+
+            return $this->openApiTransformer->transform(Union::wrap($types));
         }
 
         if (! $array instanceof KeyedArrayType) {
