@@ -292,3 +292,62 @@ it('supports resolve method call on a resource with date fields', function () {
         'required' => ['nested'],
     ]);
 });
+
+class JsonResourceExtensionTest_SpreadMatchInMixedArray extends JsonResource
+{
+    public function toArray(Request $request)
+    {
+        return [
+            'uuid' => 'abc-123',
+            ...match ($this->resource->type) {
+                'a' => [
+                    ...$this->typeA(),
+                    'type' => 'a',
+                ],
+                'b' => [
+                    ...$this->typeB(),
+                    'type' => 'b',
+                ],
+            },
+        ];
+    }
+
+    private function typeA(): array
+    {
+        return ['name' => 'Type A', 'a_field' => 1];
+    }
+
+    private function typeB(): array
+    {
+        return ['title' => 'Type B', 'b_field' => 2];
+    }
+}
+
+it('supports spread operator with union types inside mixed arrays', function () {
+    [$schema] = JsonResourceExtensionTest_analyze($this->infer, $this->context, JsonResourceExtensionTest_SpreadMatchInMixedArray::class);
+
+    expect($schema->toArray())->toBe([
+        'anyOf' => [
+            [
+                'type' => 'object',
+                'properties' => [
+                    'uuid' => ['type' => 'string', 'enum' => ['abc-123']],
+                    'name' => ['type' => 'string', 'enum' => ['Type A']],
+                    'a_field' => ['type' => 'integer', 'enum' => [1]],
+                    'type' => ['type' => 'string', 'enum' => ['a']],
+                ],
+                'required' => ['uuid', 'name', 'a_field', 'type'],
+            ],
+            [
+                'type' => 'object',
+                'properties' => [
+                    'uuid' => ['type' => 'string', 'enum' => ['abc-123']],
+                    'title' => ['type' => 'string', 'enum' => ['Type B']],
+                    'b_field' => ['type' => 'integer', 'enum' => [2]],
+                    'type' => ['type' => 'string', 'enum' => ['b']],
+                ],
+                'required' => ['uuid', 'title', 'b_field', 'type'],
+            ],
+        ],
+    ]);
+});

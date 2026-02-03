@@ -113,6 +113,13 @@ class TypeHelper
             return $type;
         }
 
+        // Check for spread items with Union values and distribute them
+        foreach ($type->items as $index => $item) {
+            if ($item->shouldUnpack && $item->value instanceof Union) {
+                return self::distributeUnionSpread($type, $index);
+            }
+        }
+
         $unpackedItems = collect($type->items)
             ->flatMap(function (ArrayItemType_ $type) {
                 if ($type->shouldUnpack && $type->value instanceof KeyedArrayType) {
@@ -132,6 +139,46 @@ class TypeHelper
             }, []);
 
         return (new KeyedArrayType(array_values($unpackedItems)))->mergeAttributes($type->attributes());
+    }
+
+    /**
+     * Distributes a spread Union inside a KeyedArrayType into a Union of KeyedArrayTypes.
+     *
+     * Transforms: KeyedArrayType([fixed, ...Union(A, B)]) into Union(KeyedArrayType([fixed, ...A]), KeyedArrayType([fixed, ...B]))
+     */
+    private static function distributeUnionSpread(KeyedArrayType $type, int $spreadIndex): Type
+    {
+        $spreadItem = $type->items[$spreadIndex];
+        /** @var Union $union */
+        $union = $spreadItem->value;
+
+        $variants = [];
+
+        foreach ($union->types as $memberType) {
+            $newItems = $type->items;
+            $newItems[$spreadIndex] = new ArrayItemType_(
+                $spreadItem->key,
+                $memberType,
+                $spreadItem->isOptional,
+                $spreadItem->shouldUnpack,
+                $spreadItem->keyType,
+            );
+
+            $variant = static::unpackIfArray(
+                (new KeyedArrayType(array_values($newItems)))->mergeAttributes($type->attributes())
+            );
+
+            // Flatten nested unions from recursive calls
+            if ($variant instanceof Union) {
+                foreach ($variant->types as $innerType) {
+                    $variants[] = $innerType;
+                }
+            } else {
+                $variants[] = $variant;
+            }
+        }
+
+        return Union::wrap($variants);
     }
 
     /**
